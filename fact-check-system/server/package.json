@@ -1,0 +1,24 @@
+{
+  "name": "debate-echo-api",
+  "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.3"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "version": "1.0.0",
+  "description": "Echo Debate API Server",
+  "main": "index.js",
+  "keywords": ["api", "debate", "fact-check"],
+  "author": "",
+  "license": "ISC"
+}

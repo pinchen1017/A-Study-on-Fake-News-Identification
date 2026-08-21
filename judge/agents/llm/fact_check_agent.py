@@ -159,7 +159,7 @@ CATEGORY_PROMPTS = {
 # -------- Step 1: 文本分類 Agent (純 LLM,無 tools) --------
 classification_agent = LlmAgent(
     name="text_classification",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     instruction=(
         "你是文本分類器。根據以下新聞文本,判斷其所屬類別。\n\n"
         "待分類文本: {_init_session}\n\n"
@@ -182,9 +182,9 @@ def _create_category_check_agent(category: str, prompt: str) -> LlmAgent:
     """根據類別和 prompt 建立查核 Agent"""
     return LlmAgent(
         name=f"fact_check_{category}",
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         instruction=prompt,
-        tools=[GoogleSearchTool()],
+        tools=[],
         output_key="fact_check_result",
         generate_content_config=types.GenerateContentConfig(temperature=0.4),
     )
@@ -202,7 +202,7 @@ category_agents["default"] = _create_category_check_agent("default", CATEGORY_PR
 # -------- Step 3: Schema 驗證 Agent (純 LLM,無 tools) --------
 schema_validator_agent = LlmAgent(
     name="fact_check_schema_validator",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     instruction=(
         "你是 Schema 驗證器。\n\n"
         "識別的新聞類別: {text_classification}\n"

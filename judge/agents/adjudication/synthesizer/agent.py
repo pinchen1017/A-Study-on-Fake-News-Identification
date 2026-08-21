@@ -72,7 +72,7 @@ def _pretty_after(agent_context=None, **_):
 
 synthesizer_agent = LlmAgent(
     name="synthesizer",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     instruction=(
         "你是『知識整合者（Synthesizer）』。根據下列輸入生成最終報告的嚴格 JSON。\n\n"
         "【輸入】\n"

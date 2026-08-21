@@ -35,7 +35,23 @@ def _ensure_and_flatten_fallacies(callback_context=None, **_):
     state["debate_messages"] = msgs
     state["fallacy_list"] = flatten_fallacies(msgs)
     return None
-
+import time
+import logging
+def delayed_callback(callback_context):
+    # 從 context 中提取資訊 (如果需要的話)
+    
+    ctx = callback_context
+    # 根據 JSON，這裡拿到的會是 "advocate_tool_runner1" 之類的名字
+    agent_name = getattr(ctx, 'agent_name', 'Unknown')
+    delay_seconds = 40 
+    print(f"--- [系統訊息] {agent_name} 執行完畢，等待 {delay_seconds} 秒 ---")
+    
+    # 執行延遲
+    time.sleep(delay_seconds)
+    
+    # 重要：回呼函式通常需要回傳 None 或特定的修改內容，
+    # 在延遲需求中，回傳 None 即可讓工作流繼續。
+    return None
 
 jury_pretty_after = None
 
@@ -62,7 +78,7 @@ jury_pretty_after = _build_jury_after()
 
 jury_agent = LlmAgent(
     name="jury",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     instruction=(
         "你是陪審團，請根據完整辯論紀錄與證據，對文本的真實性進行客觀量化評分並給出裁決。\n\n"
         "裁決目標是判斷輸入文本的真實性，請勿脫離判斷真實性的目標。\n\n"
@@ -70,14 +86,14 @@ jury_agent = LlmAgent(
         "【判斷文本】\n"
         "{_init_session}\n\n"
         "【辯論紀錄】\n"
-        "- 反方初始論點：state['skepticism1']"
-        "- 正方初始論點：state['advocacy1']"
-        "- 正方質疑反方的論點：state['advocacy2']"
-        "- 反方反駁：state['skepticism2']"
-        "- 反方質疑正方的論點：state['skepticism3']"
-        "- 正方反駁：state['advocacy3']"
-        "- 正方最終論述：state['advocacy4']" \
-        "- 反方最終論述：state['skepticism4']\n\n"
+        "- 正方初始論點：state['advocacy1']\n\n"
+        "- 反方初始論點：state['skepticism1']\n\n"
+        "- 正方質疑論點：state['advocacy2']\n\n"
+        "- 反方回應論點：state['skepticism2']\n\n"
+        "- 反方質疑論點：state['skepticism3']\n\n"
+        "- 正方回應論點：state['advocacy3']\n\n"
+        "- 正方總結論點：state['advocacy4']\n\n"
+        "- 反方總結論點：state['skepticism4']\n\n"
         "【證據】\n"
         "CURATION(JSON): {curation}\n"
         "SOCIAL_LOG(JSON): {social_log}\n\n"
@@ -88,9 +104,8 @@ jury_agent = LlmAgent(
     disallow_transfer_to_parent=True,
     disallow_transfer_to_peers=True,
     output_key="jury_result",
-    generate_content_config=types.GenerateContentConfig(temperature=0.0),
     before_agent_callback=_ensure_and_flatten_fallacies,
-    after_agent_callback=jury_pretty_after,
+    after_agent_callback=delayed_callback,
 )
 
 

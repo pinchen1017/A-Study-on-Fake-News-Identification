@@ -3,6 +3,23 @@ from pydantic import BaseModel, Field
 from google.adk.agents import LlmAgent, SequentialAgent
 
 from judge.agents.social.base import create_social_agent
+import time
+import logging
+def delayed_callback(callback_context):
+    # 從 context 中提取資訊 (如果需要的話)
+    
+    ctx = callback_context
+    # 根據 JSON，這裡拿到的會是 "advocate_tool_runner1" 之類的名字
+    agent_name = getattr(ctx, 'agent_name', 'Unknown')
+    delay_seconds = 10 
+    print(f"--- [系統訊息] {agent_name} 執行完畢，等待 {delay_seconds} 秒 ---")
+    
+    # 執行延遲
+    time.sleep(delay_seconds)
+    
+    # 重要：回呼函式通常需要回傳 None 或特定的修改內容，
+    # 在延遲需求中，回傳 None 即可讓工作流繼續。
+    return None
 
 INFLUENCER_COUNT = 2
 
@@ -28,7 +45,7 @@ _influencer_lines = "\n".join(
 # 聚合社群噪音輸出為 NoiseLog JSON
 _noise_aggregator = LlmAgent(
     name="noise_aggregator",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     instruction=(
         "你是社群噪音紀錄者，請依序讀取以下輸出並統整成 JSON。\n"
         "- Echo Chamber: {echo_chamber}\n"
@@ -40,6 +57,7 @@ _noise_aggregator = LlmAgent(
     disallow_transfer_to_parent=True,
     disallow_transfer_to_peers=True,
     output_key="social_noise",
+    before_agent_callback=delayed_callback,
 )
 
 # 公開的 social_noise_agent，先平行模擬，再聚合結果

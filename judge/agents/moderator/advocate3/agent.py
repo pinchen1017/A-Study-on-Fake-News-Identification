@@ -56,7 +56,99 @@ def _after_advocate(agent_context=None, **_):
     
     return None
 
+import asyncio
 
+from judge.tools.debate_log import Turn, append_turn
+from functools import partial
+from google.adk.events import Event
+from google.adk.events import EventActions
+import asyncio
+# 這裡直接 import 需要的組件
+from judge.tools import append_event as raw_append_fn
+from judge.tools.session_service import session_service
+
+import time
+import logging
+def delayed_callback(callback_context):
+    # 從 context 中提取資訊 (如果需要的話)
+    
+    ctx = callback_context
+    # 根據 JSON，這裡拿到的會是 "advocate_tool_runner1" 之類的名字
+    agent_name = getattr(ctx, 'agent_name', 'Unknown')
+    delay_seconds = 40 
+    print(f"--- [系統訊息] {agent_name} 執行完畢，等待 {delay_seconds} 秒 ---")
+    
+    # 執行延遲
+    time.sleep(delay_seconds)
+    
+    # 重要：回呼函式通常需要回傳 None 或特定的修改內容，
+    # 在延遲需求中，回傳 None 即可讓工作流繼續。
+    return None
+
+async def process_sync(callback_context, **kwargs):
+    ctx = callback_context
+    state = ctx.state
+    # 根據 JSON，這裡拿到的會是 "advocate_tool_runner1" 之類的名字
+    agent_name = getattr(ctx, 'agent_name', 'Unknown')
+    
+    await asyncio.sleep(0.1)
+
+    # 1. 精確修正 Key 推斷邏輯
+    import re
+    target_key = None
+    
+    # 尋找名字末尾的數字 (例如從 advocate_tool_runner2 提取 "2")
+    number_match = re.search(r'\d+', agent_name)
+    num = number_match.group() if number_match else "1"
+
+    if "advocate" in agent_name:
+        target_key = f"advocacy{num}"
+    elif "skeptic" in agent_name:
+        target_key = f"skepticism{num}"
+    
+    # 這裡增加一個 Debug，幫你確認抓到的 key 對不對
+    print(f"[DEBUG SCAN] Agent: {agent_name} -> 嘗試抓取 State Key: {target_key}")
+
+    if not target_key or target_key not in state:
+        print(f"[DEBUG ERR] State 中找不到 Key: {target_key}。可用 Key 為: {list(state.keys())}")
+        return None
+
+    raw_output = state.get(target_key)
+    if not raw_output:
+        return None
+
+    # 2. 更新記憶體
+    # 如果內容是字串就直接用，如果是物件就 dump
+    output_data = raw_output
+    if hasattr(raw_output, 'model_dump'):
+        output_data = raw_output.model_dump()
+    
+    from judge.tools.debate_log import Turn, append_turn
+    # 確保存入的是該輪次真正的內容
+    append_turn(state, Turn(speaker=agent_name, content=str(output_data)))
+
+    # 3. 建立同步事件 (確保 EventActions 結構完整，避免 NoneType 錯誤)
+    from google.adk.events.event import Event, EventActions
+    sync_event = Event(
+        author=agent_name,
+        actions=EventActions(
+            state_delta={
+                target_key: raw_output,
+                "debate_log": list(state["debate_log"])
+            }
+        )
+    )
+
+    # 4. 執行同步
+    from judge.agent import current_session
+    from judge.tools import append_event as raw_append_fn
+    from judge.tools.session_service import session_service
+    
+    if current_session:
+        await raw_append_fn(sync_event, current_session, service=session_service)
+        print(f"[DEBUG OK] {agent_name} 已成功同步 {target_key}")
+    
+    return None
 
 
 class CuratorSearchResult(BaseModel):
@@ -79,7 +171,7 @@ class AdvocateOutput(BaseModel):
 
 advocate_tool_agent3 = LlmAgent(
     name="advocate_tool_runner3",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     instruction=(
         """
         #  角色設定
@@ -90,24 +182,29 @@ advocate_tool_agent3 = LlmAgent(
         追求的目標就是讓法官相信文本是真實的。
         如果判斷文本有時間資訊，請以該時間資訊的時間點做論述。
         #  任務規則
-        - 針對反方提出的質疑state['skepticism3']進行回應。
-        - **第三輪**：進行最終論述，讓評審相信輸入文本為真的可能性。
+        - 依序針對反方提出的質疑state['skepticism3']進行反駁。
         #  可用資料
-        - 反方論點：state['skepticism3']
-        - 若需額外資料，可使用 `GoogleSearchTool` 搜尋可靠依據，以支持輸入文本為真。
+        - 正方初始論點：state['advocacy1']
+        - 反方初始論點：state['skepticism1']
+        - 正方質疑論點：state['advocacy2']
+        - 反方回應論點：state['skepticism2']
+        - 反方質疑論點：state['skepticism3']
+        - 若需額外資料，可使用 `GoogleSearchTool` 搜尋可靠依據，以支持輸入文本為真實。
         - 將最終論述與證據摘要寫入 `state['advocacy3']`。
         #  特別注意，以下事項務必都要做到：
         - 你必須無條件支持輸入文本為真實。
         - 不可違反角色設定。
-        - 論述需 **精簡扼要，300字以內**。
+        - 論述需 **精簡扼要，200字以內**。
         - 僅輸出：「反方質疑內容」、「反駁」、「證據」。
         - 請以繁體中文輸出。
 
        """
         
     ),
-    tools=[GoogleSearchTool()],
+    tools=[],
     output_key="advocacy3",
+    before_agent_callback=delayed_callback,
+    #after_agent_callback=process_sync
 )
 
 

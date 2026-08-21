@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 
 from google.adk.agents import LlmAgent, SequentialAgent
 
-from .base import create_social_agent
+from .base import create_social_agent2
 
 
 # ==== 社群擴散紀錄 Schema ====
@@ -17,7 +17,7 @@ class SocialLog(BaseModel):
 
 
 # ==== 建立平行角色流程 ====
-_social_parallel = create_social_agent(influencer_count=1, include_noise=False)
+_social_parallel = create_social_agent2(influencer_count=1, include_noise=False)
 
 # 聚合社群輸出為 SocialLog JSON
 _social_aggregator = LlmAgent(

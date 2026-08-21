@@ -19,19 +19,19 @@ class EvidenceCheckOutput(BaseModel):
 
 _evidence_tool_agent = LlmAgent(
     name="evidence_tool_runner",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     instruction=(
         "根據辯論紀錄 state['debate_messages'] 或辯論檔案，"
         "使用 GoogleSearchTool 逐條查證並將搜尋結果寫入 state['evidence_raw']。"
     ),
-    tools=[GoogleSearchTool()],
+    tools=[],
     output_key="evidence_raw",
 )
 
 
 _evidence_schema_agent = LlmAgent(
     name="evidence_schema_validator",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     instruction=(
         "請整理 state['evidence_raw']，輸出符合 EvidenceCheckOutput 的 JSON。"
     ),

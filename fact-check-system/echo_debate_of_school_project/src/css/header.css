@@ -1,0 +1,359 @@
+/* Header 組件樣式 */
+.header {
+    background: rgb(63, 74, 85);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    position: relative; /* 為回到頂部按鈕提供定位參考 */
+}
+
+.header-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem; /* 減少左右 padding 讓左側更靠左 */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 70px;
+}
+
+/* 左側 Logo 區域 - 調整為向左對齊 */
+.header-left {
+    display: flex;
+    align-items: center;
+    flex: 1; /* 讓左側區域佔用更多空間 */
+    cursor: pointer; /* 添加點擊手勢 */
+    transition: opacity 0.2s ease;
+}
+
+.header-left:hover {
+    opacity: 0.8;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.logo-container:hover {
+    opacity: 0.8;
+}
+
+.logo-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: #f7fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.brand-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.brand-subtitle {
+    font-size: 0.875rem;
+    color: white;
+    margin: 0;
+    font-weight: 400;
+}
+
+/* 右側導航區域 - 調整為右對齊 */
+.header-nav {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end; /* 改為右對齊 */
+    flex: 1; /* 讓右側區域也佔用空間 */
+}
+
+.nav-list {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+.nav-list h2 svg{
+    color: rgb(203, 163, 54);;
+}
+
+.nav-item {
+    margin: 0;
+}
+
+.nav-button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0.5rem 0;
+    transition: color 0.2s ease;
+    font-family: inherit;
+    position: relative;
+}
+
+.nav-button:hover {
+    color: rgb(221, 208, 164);
+}
+
+.nav-button.active {
+    color: rgb(221, 208, 164);
+}
+
+.nav-button.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgb(212, 174, 49);
+    border-radius: 1px;
+}
+
+.submit-button {
+    background: rgb(212, 174, 49);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    font-family: inherit;
+}
+
+.submit-button:hover {
+    background: rgb(46, 68, 91);
+}
+
+/* 平板端漢堡選單按鈕 */
+.mobile-menu-button {
+    display: none;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    transition: color 0.2s ease;
+}
+
+.mobile-menu-button:hover {
+    color: rgb(243, 240, 233);
+}
+
+/* 平板端移動選單 */
+.mobile-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: rgb(63, 74, 85);
+    border: 1px solid #e2e8f0;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    min-width: 200px;
+    z-index: 1001;
+    transform: translateY(-10px);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.mobile-menu.open {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+}
+
+.mobile-nav-list {
+    list-style: none;
+    margin: 0;
+    padding: 1rem 0;
+}
+
+.mobile-nav-item {
+    margin: 0;
+}
+
+.mobile-nav-button {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0.75rem 1.5rem;
+    text-align: left;
+    transition: background-color 0.2s ease;
+    font-family: inherit;
+}
+
+.mobile-nav-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.mobile-nav-button.active {
+    background: rgba(212, 174, 49, 0.2);
+    color: rgb(243, 240, 233);
+}
+
+/* 回到頂部按鈕 - 修正為正圓形並確保圖標顯示 */
+.scroll-to-top {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: rgb(224, 198, 127);
+    color: white;
+    border: none;
+    border-radius: 50%; /* 確保是正圓形 */
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    z-index: 999;
+    /* 確保圖標正確顯示 */
+    line-height: 1;
+    padding: 0;
+}
+
+.scroll-to-top:hover {
+    background: rgb(46, 68, 91);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* 確保圖標在按鈕中正確顯示 */
+.scroll-to-top svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    display: block;
+}
+
+/* 響應式設計 */
+@media (max-width: 1024px) {
+    .header-nav {
+        display: none; /* 隱藏桌面端導航 */
+    }
+    
+    .mobile-menu-button {
+        display: block; /* 顯示漢堡選單按鈕 */
+    }
+    
+    .mobile-menu {
+        display: block; /* 顯示移動選單 */
+    }
+}
+
+@media (max-width: 768px) {
+    .header-container {
+        padding: 0 1rem;
+        min-height: 60px;
+    }
+    
+    .brand-name {
+        font-size: 1.25rem;
+    }
+    
+    .brand-subtitle {
+        font-size: 0.75rem;
+    }
+    
+    .logo-icon {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .scroll-to-top {
+        bottom: 1.5rem;
+        right: 1.5rem;
+        width: 45px;
+        height: 45px;
+        font-size: 1.25rem;
+    }
+    
+    .scroll-to-top svg {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-container {
+        padding: 0 0.75rem;
+        min-height: 60px;
+    }
+    
+    .header-left {
+        flex: none;
+    }
+    
+    .logo-container {
+        gap: 0.5rem;
+    }
+    
+    .brand-name {
+        font-size: 1.1rem;
+    }
+    
+    .brand-subtitle {
+        font-size: 0.7rem;
+    }
+    
+    .logo-icon {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .mobile-menu {
+        min-width: 180px;
+    }
+    
+    .mobile-nav-button {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .scroll-to-top {
+        bottom: 1rem;
+        right: 1rem;
+        width: 40px;
+        height: 40px;
+        font-size: 1.1rem;
+    }
+    
+    .scroll-to-top svg {
+        width: 1.1rem;
+        height: 1.1rem;
+    }
+}

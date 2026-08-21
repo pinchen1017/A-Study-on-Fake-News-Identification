@@ -1,0 +1,18 @@
+# 系統和快取檔案
+.git
+.gitignore
+.dockerignore
+.vscode
+__pycache__
+*.pyc
+*.log
+
+# 虛擬環境 (如果存在)
+venv
+.venv
+
+# 大型測試資料或本機快取
+tests/
+logs/
+data_cache/
+fact-check-system/
