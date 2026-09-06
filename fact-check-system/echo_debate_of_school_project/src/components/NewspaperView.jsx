@@ -80,34 +80,10 @@ const groupEventsByDay = (events = []) => {
 
 const Header = ({ data }) => {
   const finalReport = data?.final_report_json || {};
-  const overall = (finalReport.overall_assessment || "").trim();
-
-  // 標題只允許短主題；若 topic 被誤植成 overall 長文則改抓其他來源
-  const resolveTopicTitle = () => {
-    const candidates = [
-      data?.rawState?._init_session,
-      data?.curationData?.query,
-      data?.multiAgent?.data?.rawState?._init_session,
-      data?.multiAgent?.data?.curationData?.query,
-      finalReport.topic,
-    ];
-
-    for (const raw of candidates) {
-      if (typeof raw !== "string") continue;
-      const t = raw.trim();
-      if (!t) continue;
-      if (overall && t === overall) continue;
-      if (t.startsWith("根據多方")) continue;
-      if (t.length > 80) continue;
-      return t;
-    }
-    return "未命名主題";
-  };
-
-  const topicTitle = resolveTopicTitle();
-  const deck = (finalReport.jury_brief || "").trim();
+  // 舊版 API：標題取 topic，副標取 overall_assessment
+  const topic = finalReport.topic || "未命名主題";
+  const deck = finalReport.overall_assessment || finalReport.jury_brief || "";
   const trust = computeTrustBadge(data);
-
   return (
     <header className="np-masthead">
       <div className="np-badge-wrap">
@@ -118,8 +94,8 @@ const Header = ({ data }) => {
           <span className="np-badge-text">{trust.label}</span>
         </div>
       </div>
-      <h1 className="np-title">{topicTitle}</h1>
-      {deck && deck !== topicTitle && <p className="np-deck">{deck}</p>}
+      <h1 className="np-title">{topic}</h1>
+      {deck && <p className="np-deck">{deck}</p>}
       <div className="np-rule" />
     </header>
   );

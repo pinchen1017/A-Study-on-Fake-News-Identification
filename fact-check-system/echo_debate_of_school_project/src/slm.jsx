@@ -42,7 +42,11 @@ function SlmAnalysis({ data }) {
             <div className="score-bar">
               <div className="score-fill" style={{ width: `${(parseFloat(classification.Probability) || 0) * 100}%` }}></div>
             </div>
-            <span>{((parseFloat(classification.Probability) || 0) * 100).toFixed(2)}%</span>
+            <span>{(() => {
+              const pct = (parseFloat(classification.Probability) || 0) * 100;
+              const fixed = pct.toFixed(2);
+              return fixed.replace(/\.?0+$/, '');
+            })()}%</span>
           </div>
         </div>
       </div>
