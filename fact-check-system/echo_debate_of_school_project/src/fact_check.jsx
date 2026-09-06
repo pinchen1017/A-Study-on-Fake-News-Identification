@@ -41,12 +41,20 @@ const getCredibilityLevel = (score) => {
   return '未知';
 };
 
-// 將 0~1 或 0~100 的分數正規化為 0~100 百分比字串
+// 將 0~1 或 0~100 的分數正規化為 0~100 百分比數字
 const normalizeScoreToPercent = (score) => {
   const n = typeof score === 'string' ? parseFloat(score) : score;
   if (isNaN(n)) return 50;
   const pct = n <= 1 ? n * 100 : n;
   return Math.max(0, Math.min(100, pct));
+};
+
+// 可信度百分比顯示：小數為 0 不顯現（12.0 → 12，12.34 → 12.34）
+const formatCredibilityPercent = (score, maxDecimals = 2) => {
+  const n = typeof score === 'string' ? parseFloat(score) : Number(score);
+  if (isNaN(n)) return '0';
+  const fixed = n.toFixed(maxDecimals);
+  return fixed.replace(/\.?0+$/, '');
 };
 
 // 根據 ambiguityScore/100 使用 getCredibilityLevel 規則計算 newsCorrectness
@@ -900,7 +908,7 @@ function FactCheck({ searchQuery, factChecks, setSearchQuery, onOpenAnalysis, on
       
       // 從權重計算中提取可信度分數
       const weightCalc = stateData.weight_calculation_json || {};
-      const ambiguityScore = normalizeScoreToPercent(weightCalc.final_score ?? 50).toFixed(2);
+      const ambiguityScore = formatCredibilityPercent(normalizeScoreToPercent(weightCalc.final_score ?? 50));
       
       // 根據 ambiguityScore/100 使用 getCredibilityLevel 規則計算新聞正確性
       const newsCorrectness = getNewsCorrectnessFromAmbiguityScore(parseFloat(ambiguityScore));
@@ -995,7 +1003,7 @@ function FactCheck({ searchQuery, factChecks, setSearchQuery, onOpenAnalysis, on
       }
 
       // 從權重計算中提取可信度分數
-      const ambiguityScore = normalizeScoreToPercent(weightCalculationData?.final_score ?? 50).toFixed(2);
+      const ambiguityScore = formatCredibilityPercent(normalizeScoreToPercent(weightCalculationData?.final_score ?? 50));
       
       // 根據 ambiguityScore/100 使用 getCredibilityLevel 規則計算新聞正確性
       const newsCorrectness = getNewsCorrectnessFromAmbiguityScore(parseFloat(ambiguityScore));
@@ -1610,7 +1618,7 @@ function FactCheck({ searchQuery, factChecks, setSearchQuery, onOpenAnalysis, on
 
     // 計算整體結果
     const messageVerification = getCredibilityLevel(responseData.weight_calculation_json.final_score);
-    const credibilityScore = normalizeScoreToPercent(responseData.weight_calculation_json.final_score).toFixed(1);
+    const credibilityScore = formatCredibilityPercent(normalizeScoreToPercent(responseData.weight_calculation_json.final_score), 1);
     
     // 根據 ambiguityScore/100 使用 getCredibilityLevel 規則計算新聞正確性
     const newsCorrectness = getNewsCorrectnessFromAmbiguityScore(parseFloat(credibilityScore));
@@ -1940,7 +1948,7 @@ function FactCheck({ searchQuery, factChecks, setSearchQuery, onOpenAnalysis, on
                             style={{ width: `${analysisResult.ambiguityScore || 0}%` }}
                           ></div>
                         </div>
-                        <span className="score-value">{analysisResult.ambiguityScore || 0}%</span>
+                        <span className="score-value">{formatCredibilityPercent(analysisResult.ambiguityScore || 0)}%</span>
                       </div>
                     </div>
                   </div>
