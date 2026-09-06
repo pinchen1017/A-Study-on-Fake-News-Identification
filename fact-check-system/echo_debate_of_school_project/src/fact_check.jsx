@@ -838,205 +838,7 @@ function FactCheck({ searchQuery, factChecks, setSearchQuery, onOpenAnalysis, on
     }
   };
 
-  // 從 events 合併 stateDelta 成完整 state
-  const mergeStateFromEvents = (events = []) => {
-    const merged = {};
-    for (const event of events) {
-      if (event?.actions?.stateDelta) {
-        Object.assign(merged, event.actions.stateDelta);
-      }
-    }
-    return merged;
-  };
-
-  // 從 events 提取 groundingChunks
-  const extractGroundingChunksFromEvents = (events = []) => {
-    const chunks = [];
-    for (const event of events) {
-      const gm = event?.groundingMetadata || event?.content?.groundingMetadata;
-      if (Array.isArray(gm?.groundingChunks)) {
-        chunks.push(...gm.groundingChunks);
-      }
-    }
-    return chunks;
-  };
-
-  // 判斷是否為新版 Agent API 格式（response_082201.json 這類）
-  const isNewAgentFormat = (state = {}) => {
-    return !!(
-      state.jury_result ||
-      state.evidence_checked ||
-      state.evidence_raw ||
-      state.advocacy1 ||
-      state.skepticism1
-    );
-  };
-
-  const verdictToFinalScore = (verdictResult) => {
-    if (verdictResult === '反方') return 0.12;
-    if (verdictResult === '正方') return 0.88;
-    return 0.5;
-  };
-
-  const buildEvidenceDigest = (state) => {
-    const evidences = state.evidence_checked?.checked_claims?.[0]?.evidences;
-    if (Array.isArray(evidences) && evidences.length > 0) {
-      return evidences.map((e) => {
-        const claim = e.claim || '';
-        const warrant = e.warrant || '';
-        return warrant ? `${claim}（${warrant}）` : claim;
-      }).filter(Boolean);
-    }
-    if (state.evidence_raw) {
-      return state.evidence_raw.split('\n\n').map((s) => s.trim()).filter(Boolean);
-    }
-    if (state.curation_raw) {
-      return state.curation_raw.split('\n\n').map((s) => s.trim()).filter(Boolean);
-    }
-    return ['暫無證據摘要'];
-  };
-
-  const buildStakeSummaries = (state) => {
-    const summaries = [];
-    const advocatePoints = [state.advocacy1, state.advocacy2, state.advocacy3, state.advocacy4].filter(Boolean);
-    const skepticPoints = [state.skepticism1, state.skepticism2, state.skepticism3, state.skepticism4].filter(Boolean);
-
-    if (advocatePoints.length > 0) {
-      summaries.push({
-        side: 'Advocate',
-        thesis: advocatePoints[0]?.split('\n')[0]?.replace(/^論點：/, '') || '正方論點',
-        strongest_points: advocatePoints.slice(0, 3),
-        weaknesses: state.jury_result?.weaknesses?.map((w) => w.point) || [],
-      });
-    }
-    if (skepticPoints.length > 0) {
-      summaries.push({
-        side: 'Skeptic',
-        thesis: skepticPoints[0]?.split('\n')[0]?.replace(/^論點：/, '') || '反方論點',
-        strongest_points: skepticPoints.slice(0, 3),
-        weaknesses: state.jury_result?.strengths?.map((s) => s.point) || [],
-      });
-    }
-    return summaries;
-  };
-
-  // 將新版 FastAPI state 映射成前端 UI 期望的舊欄位結構
-  const mapNewAgentStateToUiFormat = (state, events, query) => {
-    const jury = state.jury_result || {};
-    const apiReport = state.final_report_json || {};
-    const verdictResult = apiReport.jury_result || jury.verdict_result || '未定';
-    const finalScore = verdictToFinalScore(
-      typeof verdictResult === 'object' ? verdictResult.verdict_result : verdictResult
-    );
-    // 標題只取短主題，避免 synthesizer 把 overall 長文寫進 topic
-    const overallText = (
-      apiReport.overall_assessment ||
-      jury.verdict ||
-      state.evidence_raw ||
-      state.curation_raw ||
-      ''
-    ).trim();
-
-    const pickShortTopic = () => {
-      const candidates = [
-        state._init_session,
-        state.curation?.query,
-        query,
-        apiReport.topic,
-      ];
-      for (const raw of candidates) {
-        if (typeof raw !== 'string') continue;
-        const t = raw.trim();
-        if (!t) continue;
-        if (overallText && t === overallText) continue;
-        if (t.startsWith('根據多方')) continue;
-        if (t.length > 80) continue;
-        return t;
-      }
-      return query || '未命名主題';
-    };
-
-    const topic = pickShortTopic();
-    const evidenceDigest = buildEvidenceDigest(state);
-    const stakeSummaries = buildStakeSummaries(state);
-    const groundingChunks = extractGroundingChunksFromEvents(events);
-    const resolvedVerdict =
-      typeof verdictResult === 'object'
-        ? (verdictResult.verdict_result || '未定')
-        : verdictResult;
-
-    const weight_calculation_json = {
-      llm_label: resolvedVerdict === '反方' ? '完全錯誤' : resolvedVerdict === '正方' ? '完全正確' : '分析中',
-      llm_score: resolvedVerdict === '反方' ? 0.1 : resolvedVerdict === '正方' ? 0.9 : 0.5,
-      slm_score: finalScore,
-      jury_score: resolvedVerdict,
-      final_score: finalScore,
-    };
-
-    const final_report_json = {
-      topic,
-      overall_assessment: overallText,
-      jury_score: resolvedVerdict === '反方' ? 15 : resolvedVerdict === '正方' ? 85 : 50,
-      jury_brief: apiReport.jury_brief || jury.verdict || '',
-      jury_result: resolvedVerdict,
-      evidence_digest: evidenceDigest,
-      stake_summaries: stakeSummaries.length > 0 ? stakeSummaries : (apiReport.stake_summaries || []),
-    };
-
-    const fact_check_result_json = {
-      analysis: state.evidence_raw || state.curation_raw || jury.verdict || '',
-      classification: resolvedVerdict === '反方' ? '完全錯誤' : resolvedVerdict === '正方' ? '完全正確' : '分析中',
-    };
-
-    const classification_json = {
-      Probability: String(finalScore),
-      classification: resolvedVerdict === '反方' ? '錯誤' : resolvedVerdict === '正方' ? '正確' : '未知',
-    };
-
-    const ambiguityScore = normalizeScoreToPercent(finalScore).toFixed(2);
-
-    return {
-      weight_calculation_json,
-      final_report_json,
-      fact_check_result_json,
-      classification_json,
-      newsCorrectness: getNewsCorrectnessFromAmbiguityScore(parseFloat(ambiguityScore)),
-      ambiguityScore,
-      curationData: state.curation || { query: topic, results: [] },
-      groundingChunks,
-      organizedData: {
-        llm: {
-          fact_check_result: fact_check_result_json,
-          grounding_urls: groundingChunks.map((chunk) => ({
-            title: chunk.web?.title || '未知來源',
-            uri: chunk.web?.uri || '',
-            domain: chunk.web?.title || '',
-            searchQuery: state.curation?.query || query,
-          })),
-        },
-        slm: { classification_result: classification_json },
-        n8n: {
-          final_report: final_report_json,
-          weight_calculation: weight_calculation_json,
-        },
-      },
-      // 保留新版原始欄位，供詳細頁 / 報紙視圖使用
-      jury_result: jury,
-      evidence_checked: state.evidence_checked,
-      evidence_raw: state.evidence_raw,
-      history: state.history,
-      social: state.social_log || {
-        echo_chamber: state.echo_chamber,
-        influencer: state.influencer,
-        disrupter: state.social_noise,
-      },
-      advocacy1: state.advocacy1,
-      skepticism1: state.skepticism1,
-      rawState: state,
-    };
-  };
-
-  // 處理多agent API回應格式
+  // 處理多agent API回應格式（舊版欄位）
   const processMultiAgentResponse = (apiResponse, query) => {
     console.log("處理API回應:", apiResponse);
     
@@ -1081,13 +883,6 @@ function FactCheck({ searchQuery, factChecks, setSearchQuery, onOpenAnalysis, on
     if (apiResponse.state && Object.keys(apiResponse.state).length > 0) {
       console.log("找到state數據:", apiResponse.state);
       const stateData = apiResponse.state;
-      const events = apiResponse.events || [];
-
-      // 新版 Agent API（如 response_082201.json）
-      if (isNewAgentFormat(stateData)) {
-        console.log("偵測到新 Agent API 格式，進行欄位映射");
-        return mapNewAgentStateToUiFormat(stateData, events, query);
-      }
       
       // 從state中提取curation數據（舊版格式）
       const curationData = stateData.curation || {};
@@ -1142,19 +937,16 @@ function FactCheck({ searchQuery, factChecks, setSearchQuery, onOpenAnalysis, on
         newsCorrectness: newsCorrectness,
         ambiguityScore: ambiguityScore,
         curationData: curationData,
-        groundingChunks: groundingChunks
+        groundingChunks: groundingChunks,
+        jury_result: stateData.jury_result,
+        evidence_checked: stateData.evidence_checked,
+        social: stateData.social || stateData.social_log,
       };
     }
 
     // 檢查是否是 /run 端點返回的數組格式
     if (Array.isArray(apiResponse)) {
       console.log("檢測到 /run 端點返回的數組格式，正在解析...");
-      const mergedState = mergeStateFromEvents(apiResponse);
-
-      if (isNewAgentFormat(mergedState)) {
-        console.log("從 events 合併後偵測到新 Agent API 格式");
-        return mapNewAgentStateToUiFormat(mergedState, apiResponse, query);
-      }
       
       // 從數組中提取各個組件的數據（舊版格式）
       let weightCalculationData = null;
@@ -1247,15 +1039,6 @@ function FactCheck({ searchQuery, factChecks, setSearchQuery, onOpenAnalysis, on
     // 檢查是否有events數據
     if (apiResponse.events && apiResponse.events.length > 0) {
       console.log("找到events數據:", apiResponse.events);
-      const mergedState = {
-        ...(apiResponse.state || {}),
-        ...mergeStateFromEvents(apiResponse.events),
-      };
-
-      if (isNewAgentFormat(mergedState)) {
-        console.log("從 state + events 偵測到新 Agent API 格式");
-        return mapNewAgentStateToUiFormat(mergedState, apiResponse.events, query);
-      }
       
       // 從events中提取數據（舊版格式）
       let weightCalculationData = null;

@@ -76,7 +76,7 @@ const selectHeaderData = (data) => {
     topic: finalReport.topic || '未命名主題',
     credibilityScore: trust.value,
     credibilityLabel: trust.label,
-    overallAssessment: finalReport.jury_brief || '',
+    overallAssessment: finalReport.overall_assessment || finalReport.jury_brief || '',
     verdictText: finalReport.jury_brief
   };
 };
