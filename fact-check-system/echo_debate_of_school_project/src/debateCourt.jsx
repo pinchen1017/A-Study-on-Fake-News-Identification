@@ -10,35 +10,61 @@ import { AiTwotoneSmile, AiTwotoneFrown } from "react-icons/ai";
 // 新聞報紙版元件
 import NewspaperView from './components/NewspaperView'
 
-// 可信度徽章計算函數
+// 將新版 evidence_checked（{ checked_claims: [...] }）轉成可渲染的文字列表
+const normalizeEvidenceChecked = (evidenceChecked) => {
+  if (!evidenceChecked) return [];
+  if (typeof evidenceChecked === "string") return [evidenceChecked];
+  if (Array.isArray(evidenceChecked)) {
+    return evidenceChecked.map((e) => (typeof e === "string" ? e : e?.claim || e?.warrant || JSON.stringify(e)));
+  }
+  if (Array.isArray(evidenceChecked.checked_claims)) {
+    return evidenceChecked.checked_claims.flatMap((claimItem) => {
+      const claimTitle = claimItem?.claim ? `主張：${claimItem.claim}` : null;
+      const evidences = Array.isArray(claimItem?.evidences) ? claimItem.evidences : [];
+      const lines = evidences.map((e) => {
+        const claim = e?.claim || "";
+        const warrant = e?.warrant || "";
+        const confidence = e?.confidence ? `（信心：${e.confidence}）` : "";
+        if (claim && warrant) return `${claim} — ${warrant}${confidence}`;
+        return claim || warrant || "";
+      }).filter(Boolean);
+      return claimTitle ? [claimTitle, ...lines] : lines;
+    });
+  }
+  return [];
+};
+
+// 可信度徽章：以 final_report_json.jury_result 為準（正方→勝訴、反方→敗訴）
 const computeTrustBadge = (data) => {
   const finalReport = data?.final_report_json || {};
+  let juryResult = finalReport.jury_result;
+
+  if (juryResult != null && typeof juryResult === 'object') {
+    juryResult = juryResult.verdict_result || juryResult.verdict || null;
+  }
+  if (juryResult != null) {
+    juryResult = String(juryResult).trim();
+  }
+
+  let label = '未定';
+  if (juryResult === '正方' || juryResult === '勝訴') {
+    label = '勝訴';
+  } else if (juryResult === '反方' || juryResult === '敗訴') {
+    label = '敗訴';
+  } else if (juryResult === '未定' || juryResult === '無法判決') {
+    label = '未定';
+  }
+
   const weightCalculation = data?.weight_calculation_json || {};
-  
-  // 優先使用 final_report_json.jury_score
-  let credibilityScore = finalReport.jury_score;
-  
-  // 如果沒有，嘗試從 weight_calculation_json 獲取
-  if (typeof credibilityScore !== 'number') {
-    credibilityScore = weightCalculation.jury_score;
+  let value = finalReport.jury_score;
+  if (typeof value !== 'number') {
+    value = weightCalculation.jury_score;
   }
-  
-  // 如果還是沒有，嘗試映射 judge_score (-1~+1 到 0~100)
-  if (typeof credibilityScore !== 'number') {
-    const judgeScore = weightCalculation.judge_score;
-    if (typeof judgeScore === 'number') {
-      credibilityScore = Math.round((judgeScore + 1) * 50);
-    }
+  if (typeof value === 'number' && value <= 1 && value >= 0) {
+    value = value * 100;
   }
-  
-  if (typeof credibilityScore === 'number') {
-    return {
-      label: credibilityScore > 50 ? '勝訴' : (credibilityScore < 50 ? '敗訴' : '未定'),
-      value: credibilityScore
-    };
-  }
-  
-  return { label: '未定', value: null };
+
+  return { label, value: typeof value === 'number' ? value : null };
 };
 
 // 提取Header數據
@@ -50,7 +76,7 @@ const selectHeaderData = (data) => {
     topic: finalReport.topic || '未命名主題',
     credibilityScore: trust.value,
     credibilityLabel: trust.label,
-    overallAssessment: finalReport.overall_assessment || finalReport.jury_brief,
+    overallAssessment: finalReport.jury_brief || '',
     verdictText: finalReport.jury_brief
   };
 };
@@ -184,7 +210,14 @@ function CourtroomPanel({ data }) {
   const groundingChunks = data?.groundingChunks || [];
   const keyContentions = finalReport.stake_summaries || [];
   const juryResult = data?.jury_result || {};
-  const social = data?.social || {};
+  const rawSocial = data?.social || data?.social_log || {};
+  const social = {
+    ...rawSocial,
+    disrupter: rawSocial.disrupter || rawSocial.social_noise || "",
+    influencer_1: rawSocial.influencer_1 || rawSocial.influencer || "",
+    influencer_2: rawSocial.influencer_2 || "",
+    echo_chamber: rawSocial.echo_chamber || "",
+  };
   
   return (
     <div className="courtroom-section">
@@ -333,22 +366,22 @@ function CourtroomPanel({ data }) {
             )}
             
             {/* 證據摘要 */}
-            {data?.evidence_checked && (
-              <div className="evidence-summary">
-                <h4>證據摘要</h4>
-                <div className="evidence-content">
-                  {Array.isArray(data.evidence_checked) ? (
+            {(() => {
+              const evidenceLines = normalizeEvidenceChecked(data?.evidence_checked);
+              if (evidenceLines.length === 0) return null;
+              return (
+                <div className="evidence-summary">
+                  <h4>證據摘要</h4>
+                  <div className="evidence-content">
                     <ul>
-                      {data.evidence_checked.map((evidence, index) => (
+                      {evidenceLines.map((evidence, index) => (
                         <li key={index}>{evidence}</li>
                       ))}
                     </ul>
-                  ) : (
-                    <p>{data.evidence_checked}</p>
-                  )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
           
           {/* 4. 民眾視角 - 社會擾動 */}
