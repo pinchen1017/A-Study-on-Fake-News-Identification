@@ -9,24 +9,63 @@ import { FaAngleRight } from "react-icons/fa6";
 import { CiLink } from "react-icons/ci";
 import "../css/newspaper.css";
 
-// 可信度徽章計算（與你的版本等價，做健壯處理）
+// 可信度徽章：以 final_report_json.jury_result 為準（正方→勝訴、反方→敗訴）
 const computeTrustBadge = (data) => {
   const finalReport = data?.final_report_json || {};
-  const weight = data?.weight_calculation_json || {};
-  let credibilityScore = finalReport.jury_score;
-  if (typeof credibilityScore !== "number") credibilityScore = weight.jury_score;
-  if (typeof credibilityScore !== "number") {
-    const judgeScore = weight.judge_score;
-    if (typeof judgeScore === "number") credibilityScore = Math.round((judgeScore + 1) * 50);
+  let juryResult = finalReport.jury_result;
+
+  if (juryResult != null && typeof juryResult === "object") {
+    juryResult = juryResult.verdict_result || juryResult.verdict || null;
   }
-  const label = typeof credibilityScore === "number"
-    ? (credibilityScore > 50 ? "勝訴" : (credibilityScore < 50 ? "敗訴" : "未定"))
-    : "未定";
-  return { label, value: typeof credibilityScore === "number" ? credibilityScore : null };
+  if (juryResult != null) {
+    juryResult = String(juryResult).trim();
+  }
+
+  let label = "未定";
+  if (juryResult === "正方" || juryResult === "勝訴") {
+    label = "勝訴";
+  } else if (juryResult === "反方" || juryResult === "敗訴") {
+    label = "敗訴";
+  } else if (juryResult === "未定" || juryResult === "無法判決") {
+    label = "未定";
+  }
+
+  const weight = data?.weight_calculation_json || {};
+  let value = finalReport.jury_score;
+  if (typeof value !== "number") value = weight.jury_score;
+  if (typeof value === "number" && value <= 1 && value >= 0) {
+    value = value * 100;
+  }
+
+  return { label, value: typeof value === "number" ? value : null };
 };
 
 const roleName = (side) =>
   side === "Advocate" ? "正方" : side === "Skeptic" ? "反方" : side === "Devil" ? "挑戰權威者" : (side || "角色");
+
+// 將新版 evidence_checked（{ checked_claims: [...] }）轉成可渲染的文字列表
+const normalizeEvidenceChecked = (evidenceChecked) => {
+  if (!evidenceChecked) return [];
+  if (typeof evidenceChecked === "string") return [evidenceChecked];
+  if (Array.isArray(evidenceChecked)) {
+    return evidenceChecked.map((e) => (typeof e === "string" ? e : e?.claim || e?.warrant || JSON.stringify(e)));
+  }
+  if (Array.isArray(evidenceChecked.checked_claims)) {
+    return evidenceChecked.checked_claims.flatMap((claimItem) => {
+      const claimTitle = claimItem?.claim ? `主張：${claimItem.claim}` : null;
+      const evidences = Array.isArray(claimItem?.evidences) ? claimItem.evidences : [];
+      const lines = evidences.map((e) => {
+        const claim = e?.claim || "";
+        const warrant = e?.warrant || "";
+        const confidence = e?.confidence ? `（信心：${e.confidence}）` : "";
+        if (claim && warrant) return `${claim} — ${warrant}${confidence}`;
+        return claim || warrant || "";
+      }).filter(Boolean);
+      return claimTitle ? [claimTitle, ...lines] : lines;
+    });
+  }
+  return [];
+};
 
 const groupEventsByDay = (events = []) => {
   const sorted = [...events].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
@@ -40,8 +79,35 @@ const groupEventsByDay = (events = []) => {
 };
 
 const Header = ({ data }) => {
-  const { topic, overall_assessment } = data?.final_report_json || {};
+  const finalReport = data?.final_report_json || {};
+  const overall = (finalReport.overall_assessment || "").trim();
+
+  // 標題只允許短主題；若 topic 被誤植成 overall 長文則改抓其他來源
+  const resolveTopicTitle = () => {
+    const candidates = [
+      data?.rawState?._init_session,
+      data?.curationData?.query,
+      data?.multiAgent?.data?.rawState?._init_session,
+      data?.multiAgent?.data?.curationData?.query,
+      finalReport.topic,
+    ];
+
+    for (const raw of candidates) {
+      if (typeof raw !== "string") continue;
+      const t = raw.trim();
+      if (!t) continue;
+      if (overall && t === overall) continue;
+      if (t.startsWith("根據多方")) continue;
+      if (t.length > 80) continue;
+      return t;
+    }
+    return "未命名主題";
+  };
+
+  const topicTitle = resolveTopicTitle();
+  const deck = (finalReport.jury_brief || "").trim();
   const trust = computeTrustBadge(data);
+
   return (
     <header className="np-masthead">
       <div className="np-badge-wrap">
@@ -52,8 +118,8 @@ const Header = ({ data }) => {
           <span className="np-badge-text">{trust.label}</span>
         </div>
       </div>
-      <h1 className="np-title">{topic || "未命名主題"}</h1>
-      {overall_assessment && <p className="np-deck">{overall_assessment}</p>}
+      <h1 className="np-title">{topicTitle}</h1>
+      {deck && deck !== topicTitle && <p className="np-deck">{deck}</p>}
       <div className="np-rule" />
     </header>
   );
@@ -425,9 +491,21 @@ const NewsCourtroom = ({ data }) => {
   // 嘗試多種可能的 social 資料路徑，並從現有資料構造
   let social = data?.social || 
                data?.raw?.social || 
+               data?.social_log ||
                data?.final_report_json?.social ||
                data?.social_disturbance ||
                {};
+
+  // 新版 social_log 欄位對齊舊 UI（influencer → influencer_1）
+  if (social && Object.keys(social).length > 0) {
+    social = {
+      ...social,
+      disrupter: social.disrupter || social.social_noise || "",
+      influencer_1: social.influencer_1 || social.influencer || "",
+      influencer_2: social.influencer_2 || "",
+      echo_chamber: social.echo_chamber || "",
+    };
+  }
   
   // 如果沒有找到 social 資料，嘗試從 final_report_json 構造
   if (!social || Object.keys(social).length === 0) {
@@ -706,22 +784,22 @@ const NewsCourtroom = ({ data }) => {
         )}
         
         {/* 證據摘要 */}
-        {data?.evidence_checked && (
-          <div className="np-evidence">
-            <h4>證據摘要</h4>
-            <div className="np-evidence-content">
-              {Array.isArray(data.evidence_checked) ? (
+        {(() => {
+          const evidenceLines = normalizeEvidenceChecked(data?.evidence_checked);
+          if (evidenceLines.length === 0) return null;
+          return (
+            <div className="np-evidence">
+              <h4>證據摘要</h4>
+              <div className="np-evidence-content">
                 <ul>
-                  {data.evidence_checked.map((evidence, i) => (
+                  {evidenceLines.map((evidence, i) => (
                     <li key={i}>{evidence}</li>
                   ))}
                 </ul>
-              ) : (
-                <p>{data.evidence_checked}</p>
-              )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
       
       {/* 民眾視角 - 社會擾動 */}
